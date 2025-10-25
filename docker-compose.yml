@@ -1,0 +1,63 @@
+version: "3.9"
+
+services:
+  db:
+    image: mysql:8.0
+    restart: unless-stopped
+    container_name: mysql-db
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: carrentaldb
+      MYSQL_USER: carrental
+      MYSQL_PASSWORD: carrental123
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./carrental-backend
+      dockerfile: Dockerfile
+    container_name: carrental-backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8081:8081"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://db:3306/carrentaldb?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+      SPRING_DATASOURCE_USERNAME: carrental
+      SPRING_DATASOURCE_PASSWORD: carrental123
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      SPRING_JPA_SHOW_SQL: "true"
+    networks:
+      - carrental-net
+
+  frontend:
+    build:
+      context: ./carrental-frontend
+      dockerfile: Dockerfile
+    container_name: carrental-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "8081:8081"
+    environment:
+      VITE_API_URL: "http://backend:8081"
+    networks:
+      - carrental-net
+
+volumes:
+  mysql_data:
+
+networks:
+  carrental-net:
+    driver: bridge
